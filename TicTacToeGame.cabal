@@ -1,0 +1,26 @@
+cabal-version:      2.4
+name:               TicTacToeGame
+version:            0.1.0.0
+
+synopsis: A small Tic Tac Toe program using Gloss.
+
+-- A longer description of the package.
+-- description:
+
+author:             ivy bridges
+maintainer:         ivy.v.bridges@gmail.com
+
+
+extra-source-files: 
+
+executable TicTacToeGame
+    main-is:          Main.hs
+
+    -- Modules included in this executable, other than Main.
+    other-modules: BoardHelper, TicTacToe
+
+    -- LANGUAGE extensions used by modules in this package.
+    -- other-extensions:
+    build-depends:    base ^>=4.16.0.0, array >= 0.5.4.0
+    hs-source-dirs:   app
+    default-language: Haskell2010
