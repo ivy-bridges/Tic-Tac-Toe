@@ -72,7 +72,10 @@ makeMove (GameState (board, player)) pos
     
 -- pulls the board from a gamestate
 pullBoard :: GameState -> Board
-pullBoard (GameState (board, _)) = board    
+pullBoard (GameState (board, _)) = board
+
+pullPlayer :: GameState -> Mark
+pullPlayer (GameState (_, mark)) = mark
 
     
     
