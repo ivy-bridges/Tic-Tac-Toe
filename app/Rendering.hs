@@ -24,32 +24,47 @@ type GameWorld = (GameState, (Int, Int))
 emptyGame :: GameState
 emptyGame = GameState ((emptyBoard 3 3), X)
 
--- functions for checking key type
-isArrowKey :: SpecialKey -> Bool
-isArrowKey key = elem key [KeyUp,KeyDown,KeyLeft,KeyRight]
+-- functions for checking different input types
+isArrowKey :: Key -> Bool
+isArrowKey (SpecialKey key) = elem key [KeyUp,KeyDown,KeyLeft,KeyRight]
+isArrowKey _ = False
 
-isSpaceKey :: SpecialKey -> Bool
-isSpaceKey key = key == KeySpace
+isPlaceKey :: Key -> Bool
+isPlaceKey key = (key == SpecialKey KeySpace) || (key == MouseButton LeftButton)
 
-isResetKey :: SpecialKey -> Bool
-isResetKey key = key == KeyEnter
+isResetKey :: Key -> Bool
+isResetKey key = (key == SpecialKey KeyEnter) || (key == MouseButton RightButton)
 
 -- moves the selected square within the bounds (1,1), (3,3)
-moveSelection :: SpecialKey -> (Int, Int) -> (Int, Int)
-moveSelection key (x,y)
+moveSelection :: Key -> (Int, Int) -> (Int, Int)
+moveSelection (SpecialKey key) (x,y)
     | key == KeyDown    && y>1 = (x,y-1)
     | key == KeyUp      && y<3 = (x,y+1)
     | key == KeyLeft    && x>1 = (x-1,y)
     | key == KeyRight   && x<3 = (x+1,y)
     | otherwise                = (x,y)
 
+-- updates the selected square based on mouse position if within bounds
+mouseSelection :: (Float, Float) -> (Int, Int) -> (Int,Int)
+mouseSelection (mx, my) (x,y)
+    | outsideBounds = (x,y)
+    | otherwise     = (gridSquare xPos, gridSquare yPos)    
+    where outsideBounds = (abs(mx) > 225) || (abs(my) > 225)
+          -- position relative to top left corner of grid
+          (xPos, yPos) = (mx + 225, my+225)
+          gridSquare = ((+1) . floor . (/150))
+
 -- handling key events
 -- arrow keys move the selection around, space key makes a move (marks a square)
 handleEvents :: Event -> GameWorld -> GameWorld
-handleEvents (EventKey (SpecialKey key) Down _ _) (state, selection)
+handleEvents (EventKey key Down _ _) (state, selection)
     | isArrowKey key = (state, moveSelection key selection)
-    | isSpaceKey key = (makeMove state selection, selection)
+    | isPlaceKey key = (makeMove state selection, selection)
     | isResetKey key = (emptyGame, selection)
+    
+handleEvents (EventMotion (mx, my)) (state, selection)
+                     = (state, mouseSelection (mx,my) selection)
+                     
 handleEvents _ game = game
 
 -- we don't need to do anything when time passes
