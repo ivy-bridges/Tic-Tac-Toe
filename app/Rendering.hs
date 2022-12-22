@@ -24,6 +24,11 @@ type GameWorld = (GameState, (Int, Int))
 emptyGame :: GameState
 emptyGame = GameState ((emptyBoard 3 3), X)
 
+gameOver :: GameState -> Bool
+gameOver (GameState (board, _)) = winnerExists || boardIsFull
+    where winnerExists = (checkWinner board) /= Nothing
+          boardIsFull  = null $ filter (==Empty) (elems board)
+
 -- functions for checking different input types
 isArrowKey :: Key -> Bool
 isArrowKey (SpecialKey key) = elem key [KeyUp,KeyDown,KeyLeft,KeyRight]
@@ -33,8 +38,7 @@ isPlaceKey :: Key -> Bool
 isPlaceKey key = (key == SpecialKey KeySpace) || (key == MouseButton LeftButton)
 
 isResetKey :: Key -> Bool
-isResetKey key = (key == SpecialKey KeyEnter) || (key == MouseButton RightButton)
-
+isResetKey key = elem key [SpecialKey KeyEnter, MouseButton RightButton, Char 'r']
 -- moves the selected square within the bounds (1,1), (3,3)
 moveSelection :: Key -> (Int, Int) -> (Int, Int)
 moveSelection (SpecialKey key) (x,y)
@@ -49,7 +53,7 @@ mouseSelection :: (Float, Float) -> (Int, Int) -> (Int,Int)
 mouseSelection (mx, my) (x,y)
     | outsideBounds = (x,y)
     | otherwise     = (gridSquare xPos, gridSquare yPos)    
-    where outsideBounds = (abs(mx) > 225) || (abs(my) > 225)
+    where outsideBounds = (abs(mx) >= 225) || (abs(my) >= 225)
           -- position relative to top left corner of grid
           (xPos, yPos) = (mx + 225, my+225)
           gridSquare = ((+1) . floor . (/150))
@@ -59,8 +63,9 @@ mouseSelection (mx, my) (x,y)
 handleEvents :: Event -> GameWorld -> GameWorld
 handleEvents (EventKey key Down _ _) (state, selection)
     | isArrowKey key = (state, moveSelection key selection)
-    | isPlaceKey key = (makeMove state selection, selection)
+    | isPlaceKey key && (not . gameOver) state = (makeMove state selection, selection)
     | isResetKey key = (emptyGame, selection)
+
     
 handleEvents (EventMotion (mx, my)) (state, selection)
                      = (state, mouseSelection (mx,my) selection)
@@ -74,21 +79,37 @@ passTime _ world = world
 
 -- renders the lines of the grid, the highlighted square, and the state of the game
 renderGame :: GameWorld -> Picture
-renderGame (state, (sx,sy)) = Pictures [gridLines, squareHighlight, renderedBoard]
+renderGame (state, (sx,sy))
+    | (not . gameOver) state = Pictures [gridLines, squareHighlight, markPreview, renderedBoard]
+    | otherwise              = Pictures [gridLines, squareHighlight, renderedBoard]
     where gridLines = Pictures $ map (Color black) [l1,l2,l3,l4]
-    
+          
+          -- drawing lines of the grid
           l1 = Line [(-75,-225), (-75, 225)]
           l2 = Line [(75,-225), (75, 225)]        
           l3 = Line [(-225,-75), (225, -75)]
           l4 = Line [(-225,75), (225, 75)]
           
+          -- getting x and y offset of selected square
           squareX = (-300) + (150*fromIntegral(sx)) 
           squareY = (-300) + (150*fromIntegral(sy)) :: Float
-          selectionSquare = Color selectionColor $ rectangleSolid 149 149
           
+          -- highlights the selected square and previews the current player's mark
+          selectionSquare -- display a blue square if game is running, and a grey square if game is over
+            | gameOver state = Color (makeColor 0.8 0.8 0.8 0.5) $ rectangleSolid 149 149
+            | otherwise      = Color selectionColor $ rectangleSolid 149 149
+          -- draw the current player's mark
+          selectionPreview = Color previewColor $ renderMark (pullPlayer state)
+          
+      
           squareHighlight = Translate squareX squareY selectionSquare
+          markPreview -- only display preview if square is empty
+            | (pullBoard state) ! (sx,sy) == Empty = Translate squareX squareY selectionPreview
+            | otherwise = Blank
           
-          renderedBoard = Color blue $ renderBoard (pullBoard state)
+          -- render the already placed marks
+          renderedBoard = Color black $ renderBoard (pullBoard state)
+          
           
 -- render a single mark
 -- x draws an x, o draws a circle      
@@ -119,3 +140,4 @@ renderBoard board = Pictures translatedSquares
           
 -- useful colors
 selectionColor = makeColor 0.5 0.5 1 0.5
+previewColor = makeColor 0 0 1 0.8
